@@ -6,10 +6,9 @@ Tuya de la maison (enregistrées dans MariaDB) et prévisions sur 5 jours
 
 ## Contenu
 
-| Dossier | Rôle |
-|---|---|
-| `StationMeteo/` | Application actuelle (serveur web, acquisition Tuya, sauvegarde) |
-| `Affiche_Meteo/`, `MeteoMaison/` | Anciennes versions, conservées pour référence |
+L'application se trouve dans `StationMeteo/` : serveur web, acquisition
+des capteurs Tuya et sauvegarde de la base (envoi vers pCloud via le
+plugin `meteo/destinations/pcloud.py`).
 
 ## Configuration (fichiers non publiés)
 
