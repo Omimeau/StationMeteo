@@ -1,0 +1,6 @@
+{
+    "apiKey": "votre_access_id_tuya",
+    "apiSecret": "votre_access_secret_tuya",
+    "apiRegion": "eu",
+    "apiDeviceID": "id_d_un_de_vos_appareils"
+}
