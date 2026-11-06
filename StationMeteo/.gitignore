@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+# Configuration locale et secrets
+config_local.py
+tinytuya.json
+devices.json
+snapshot.json
+tuya-raw.json
+
+# Etat de l'affichage, recree automatiquement
+donnees/
+*.log

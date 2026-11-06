@@ -1,0 +1,25 @@
+# Environnements Python et fichiers temporaires
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+
+# Configurations locales et secrets
+**/config_local.py
+**/tinytuya.json
+**/devices.json
+
+# Donnees locales, journaux et exports de base
+**/*.log
+**/*.sql
+**/*.sql.gz
+**/snapshot.json
+**/tuya-raw.json
+Affiche_Meteo/ville.json
+Affiche_Meteo/fournisseur.json
+Affiche_Meteo/previsions_du_jour.json
+
+# Sauvegardes de fichiers
+*.bak
+*.bak.*
+StationMeteo/donnees/

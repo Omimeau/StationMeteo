@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "affiche-meteo",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["serveur.py"],
+      "port": 5000
+    }
+  ]
+}

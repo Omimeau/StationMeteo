@@ -1,0 +1,7 @@
+flask
+requests
+tzdata
+waitress
+gunicorn; sys_platform != "win32"
+mysql-connector-python
+tinytuya

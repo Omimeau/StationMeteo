@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "station-meteo",
+      "runtimeExecutable": "StationMeteo/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "StationMeteo/serveur.py"
+      ],
+      "port": 5000
+    },
+    {
+      "name": "affiche-meteo",
+      "runtimeExecutable": "Affiche_Meteo/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "Affiche_Meteo/serveur.py"
+      ],
+      "port": 5000
+    }
+  ]
+}

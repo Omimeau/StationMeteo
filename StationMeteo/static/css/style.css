@@ -1,0 +1,290 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 12px;
+    background: #142338;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 10px;
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(20px, 2.5vw, 34px);
+}
+
+#periode {
+    color: #ffdf83;
+    font-weight: bold;
+    font-size: clamp(17px, 2vw, 26px);
+}
+
+/* =======================================
+   GRILLE DES PRÉVISIONS
+   ======================================= */
+
+.grille {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    height: calc(100vh - 90px);
+    min-height: 510px;
+}
+
+.case {
+    border: 1px solid #405978;
+    background: #223751;
+    border-radius: 14px;
+    padding: 15px;
+    overflow: auto;
+}
+
+.aujourdhui {
+    background: #294967;
+    border: 2px solid #f8ce66;
+}
+
+.date {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: clamp(16px, 1.8vw, 24px);
+    font-weight: bold;
+    text-transform: capitalize;
+    margin-bottom: 8px;
+}
+
+.periode-case {
+    font-size: 0.75em;
+    font-weight: normal;
+    color: #ffdf83;
+    white-space: nowrap;
+}
+
+.description {
+    color: #d4e5f7;
+    font-size: clamp(13px, 1.3vw, 18px);
+}
+
+.icone {
+    font-size: clamp(27px, 3vw, 45px);
+}
+
+.temperature {
+    font-size: clamp(22px, 2.6vw, 38px);
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    font-size: clamp(12px, 1.1vw, 16px);
+    line-height: 1.4;
+}
+
+.details div {
+    padding: 5px;
+    background: #ffffff0d;
+    border-radius: 5px;
+}
+
+/* =======================================
+   CASE D'INFORMATION (date, heure, cache)
+   ======================================= */
+
+.information {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    text-align: left;
+    gap: 12px;
+}
+
+/* Date et heure centrées */
+.date-heure {
+    text-align: center;
+    padding: 12px 0 20px 0;
+}
+
+/* Date du jour */
+#dateJour {
+    font-size: clamp(20px, 2vw, 30px);
+    font-weight: bold;
+    text-transform: capitalize;
+    margin-bottom: 12px;
+}
+
+/* Horloge principale */
+.information .horloge {
+    font-size: clamp(32px, 4vw, 58px);
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Informations disposées comme les cases météo */
+.information .details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    width: 100%;
+}
+
+/* Source météo */
+.source-meteo {
+    margin-top: auto;
+    font-size: 12px;
+    color: #b7cbe1;
+    text-align: center;
+}
+
+/* Fournisseur de prévisions : cliquable pour en changer */
+.choix-fournisseur {
+    display: inline-block;
+    padding: 6px 4px;
+    color: #ffdf83;
+    border-bottom: 1px dotted #ffdf83;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* =======================================
+   MISE EN PAGE GÉNÉRALE
+   ======================================= */
+
+/* Ensemble : capteurs à gauche + météo à droite */
+.affichage-complet {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 12px;
+    height: calc(100vh - 24px);
+    min-height: 510px;
+}
+
+/* La grille météo garde ses 3 colonnes et 2 lignes */
+.affichage-complet .grille {
+    height: 100%;
+    min-height: 0;
+}
+
+/* =======================================
+   CAPTEURS METEOMAISON
+   ======================================= */
+
+/* Colonne dynamique des capteurs */
+.colonne-capteurs {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#liste-capteurs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Une case par périphérique */
+.case-capteur {
+    border: 1px solid #405978;
+    background: #223751;
+    border-radius: 14px;
+    padding: 15px;
+    text-align: center;
+}
+
+.case-capteur h3 {
+    font-size: 17px;
+    margin: 0 0 12px;
+    overflow-wrap: anywhere;
+}
+
+.temperature-capteur {
+    font-size: clamp(30px, 3vw, 48px);
+    font-weight: bold;
+    margin: 12px 0;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.ligne-mesures {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: nowrap;
+}
+
+.detail-capteur {
+    font-size: 15px;
+    margin: 8px 0;
+}
+
+.ligne-mesures .detail-capteur {
+    white-space: nowrap;
+}
+
+.date-capteur {
+    margin-top: 12px;
+    color: #b7cbe1;
+    font-size: 12px;
+}
+
+.extremes-capteur {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #405978;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.extremes-capteur:empty {
+    display: none;
+}
+
+/* =======================================
+   ÉCRANS ÉTROITS
+   ======================================= */
+
+@media (max-width: 900px) {
+    .affichage-complet {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .affichage-complet .grille {
+        height: auto;
+        min-height: 510px;
+    }
+
+    #liste-capteurs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .grille {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: auto;
+        height: auto;
+    }
+
+    .case {
+        min-height: 260px;
+    }
+}
