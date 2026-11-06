@@ -1,12 +1,16 @@
-"""Sauvegarde la base MeteoMaison en SQL.gz puis l'envoie vers le lien pCloud.
+"""Sauvegarde la base MeteoMaison en SQL.gz puis l'envoie vers sa destination.
 
 Utilisation (Linux uniquement) :
     - par serveur.py, en tâche de fond (demarrer_en_arriere_plan), à partir
       de SAUVEGARDE_HEURE puis toutes les SAUVEGARDE_PERIODICITE_HEURES heures ;
     - seule, pour une sauvegarde immédiate : python -m meteo.sauvegarde
 
-Parametres lus dans config_local.py : DB_*, PCLOUD_UPLOAD_CODE et SAUVEGARDE_*.
-Prerequis : mysql/mariadb-dump, curl, Python 3 (bibliotheque standard).
+L'envoi de l'archive est délégué au paquet destinations (pCloud par
+défaut) : ce module ne contient aucune logique propre à un hébergeur.
+
+Parametres lus dans config_local.py : DB_* et SAUVEGARDE_* (plus ceux de
+la destination choisie, par exemple PCLOUD_UPLOAD_CODE).
+Prerequis : mysql/mariadb-dump, Python 3 (bibliotheque standard).
 """
 
 from __future__ import annotations
@@ -23,10 +27,8 @@ import tempfile
 import threading
 from datetime import datetime, time, timedelta
 
-from . import config
+from . import config, destinations
 
-# Le domaine eapi.pcloud.com correspond aux comptes pCloud en Europe.
-PCLOUD_UPLOAD_URL = "https://eapi.pcloud.com/uploadtolink"
 REPERTOIRE_SAUVEGARDES = Path.home() / "sauvegardes" / "MeteoMaison"
 CONSERVATION_LOCALE_JOURS = 14
 
@@ -87,15 +89,14 @@ def _sauvegarder() -> int:
         utilisateur = config.DB_USER
         mot_de_passe = config.DB_PASSWORD
         base = str(config.DB_NAME)
-        code_pcloud = str(config.parametre("PCLOUD_UPLOAD_CODE")).strip()
-        if not re.fullmatch(r"[a-zA-Z0-9]+", code_pcloud):
-            raise ValueError("PCLOUD_UPLOAD_CODE contient des caracteres inattendus")
+
+        # Contrôle de la destination avant le dump, pour échouer tout de suite
+        # si elle est mal configurée.
+        destinations.verifier_destination()
 
         outil_dump = shutil.which("mariadb-dump") or shutil.which("mysqldump")
         if not outil_dump:
             raise RuntimeError("Installer un client SQL : sudo apt install mariadb-client")
-        if not shutil.which("curl"):
-            raise RuntimeError("Installer curl : sudo apt install curl")
 
         horodatage = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         nom_base = re.sub(r"[^a-zA-Z0-9_-]", "_", base)
@@ -151,44 +152,15 @@ def _sauvegarder() -> int:
                 Path(nom_cred).unlink(missing_ok=True)
             provisoire.unlink(missing_ok=True)
 
-        # L'API pCloud retourne un JSON : HTTP 200 ne suffit pas pour conclure.
-        print("Televersement vers pCloud...")
-        transfert = subprocess.run(
-            [
-                "curl", "--fail", "--silent", "--show-error", "--retry", "2",
-                "--retry-delay", "10", "--connect-timeout", "20",
-                "--max-time", "1800", "--form", f"code={code_pcloud}",
-                "--form", "names=StationMeteo",
-                "--form", "nopartial=1",
-                "--form", f"file=@{archive};filename={archive.name}",
-                PCLOUD_UPLOAD_URL,
-            ],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, timeout=1900, check=False
-        )
-        if transfert.returncode != 0:
-            raise RuntimeError(
-                f"Echec de la connexion pCloud ({transfert.returncode}) : "
-                f"{transfert.stderr.strip()}. Archive locale conservee : {archive}"
-            )
         try:
-            reponse = json.loads(transfert.stdout)
-        except json.JSONDecodeError as err:
+            destinations.sauve_l_archive(archive)
+        except (RuntimeError, subprocess.TimeoutExpired) as erreur:
             raise RuntimeError(
-                "Reponse pCloud non JSON ; verifier le televersement. "
-                f"Archive locale conservee : {archive}"
-            ) from err
-        if not isinstance(reponse, dict) or reponse.get("result") != 0:
-            raise RuntimeError(
-                f"pCloud refuse la sauvegarde : code={reponse.get('result') if isinstance(reponse, dict) else 'inconnu'}, "
-                f"message={reponse.get('error', 'indeterminee') if isinstance(reponse, dict) else 'reponse inattendue'}. "
-                f"Archive locale conservee : {archive}"
-            )
+                f"{erreur}. Archive locale conservee : {archive}"
+            ) from erreur
 
-        print("Televersement pCloud confirme (result=0).")
-
-        # Un lien de depot ne permet pas la suppression des archives pCloud.
-        # On nettoie donc UNIQUEMENT les copies locales anciennes.
+        # On ne nettoie que les copies locales anciennes (la destination
+        # distante gère sa propre conservation).
         limite = datetime.now() - timedelta(days=CONSERVATION_LOCALE_JOURS)
         for ancienne in REPERTOIRE_SAUVEGARDES.glob(f"{nom_base}_*.sql.gz"):
             if datetime.fromtimestamp(ancienne.stat().st_mtime) < limite:

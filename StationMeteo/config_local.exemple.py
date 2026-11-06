@@ -46,7 +46,10 @@ MET_NORWAY_CONTACT = "votre.adresse@exemple.fr"
 # Clé gratuite sur https://openweathermap.org/api (laisser vide sinon).
 OPENWEATHERMAP_API_KEY = ""
 
-# --- Sauvegarde de la base vers pCloud (facultatif) ---------------------
+# --- Sauvegarde de la base (facultatif) ---------------------------------
+# Destination de l'archive : nom d'un module de meteo/destinations/.
+SAUVEGARDE_DESTINATION = "pcloud"
+# pCloud : code du lien de dépôt (donnée personnelle, ne pas publier).
 PCLOUD_UPLOAD_CODE = ""
 SAUVEGARDE_AUTOMATIQUE = False
 SAUVEGARDE_HEURE = "03:01"

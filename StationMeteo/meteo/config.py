@@ -66,8 +66,10 @@ INTERVALLE_METEO = parametre("INTERVALLE_METEO", defaut=3600)
 MET_NORWAY_CONTACT = parametre("MET_NORWAY_CONTACT", defaut="")
 OPENWEATHERMAP_API_KEY = parametre("OPENWEATHERMAP_API_KEY", defaut="")
 
-# Sauvegarde (le code pCloud n'est exigé qu'au lancement d'une sauvegarde)
-PCLOUD_UPLOAD_CODE = parametre("PCLOUD_UPLOAD_CODE", defaut="")
+# Sauvegarde. Les paramètres propres à chaque destination (par exemple
+# PCLOUD_UPLOAD_CODE) sont lus par son module dans meteo/destinations/,
+# uniquement au lancement d'une sauvegarde.
+SAUVEGARDE_DESTINATION = parametre("SAUVEGARDE_DESTINATION", defaut="pcloud")
 SAUVEGARDE_AUTOMATIQUE = bool(parametre("SAUVEGARDE_AUTOMATIQUE", defaut=True))
 SAUVEGARDE_HEURE = parametre("SAUVEGARDE_HEURE", defaut="03:01")
 SAUVEGARDE_PERIODICITE_HEURES = int(parametre("SAUVEGARDE_PERIODICITE_HEURES", defaut=24))
