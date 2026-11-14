@@ -61,6 +61,47 @@ HISTORIQUE_TEMPERATURE_HEURES = parametre(
 )
 INTERVALLE_CAPTEURS = parametre("INTERVALLE_CAPTEURS", defaut=300)
 INTERVALLE_METEO = parametre("INTERVALLE_METEO", defaut=3600)
+# Mode nuit (bouton 🌙 de la case d'information) : luminosité en %,
+# limitée entre 5 et 100 pour que l'écran ne devienne jamais tout noir.
+LUMINOSITE_NUIT = min(100, max(5, int(parametre("LUMINOSITE_NUIT", defaut=35))))
+
+
+def _heure_en_minutes(nom):
+    """Heure "HH:MM" convertie en minutes depuis minuit ; None si vide
+    ou invalide (le paramètre est alors ignoré)."""
+    valeur = str(parametre(nom, defaut="")).strip()
+    if not valeur:
+        return None
+
+    try:
+        heures, minutes = (int(x) for x in valeur.split(":"))
+        if 0 <= heures < 24 and 0 <= minutes < 60:
+            return heures * 60 + minutes
+    except ValueError:
+        pass
+
+    print(f"{nom} invalide (attendu HH:MM) : {valeur!r}, ignoré")
+    return None
+
+
+# Mode nuit programmé (heure de Paris, "HH:MM", la plage peut passer
+# minuit). À NUIT_DEBUT la page passe en mode nuit ; à NUIT_FIN elle
+# revient au mode jour si le mode nuit est toujours là. Vides (défaut) :
+# pas de programmation. Les deux sont nécessaires et doivent différer.
+NUIT_DEBUT = _heure_en_minutes("NUIT_DEBUT")
+NUIT_FIN = _heure_en_minutes("NUIT_FIN")
+if NUIT_DEBUT is None or NUIT_FIN is None or NUIT_DEBUT == NUIT_FIN:
+    NUIT_DEBUT = NUIT_FIN = None
+
+# Affichage interactif (écran tactile) : True = tous les fournisseurs sont
+# interrogés en arrière-plan, le fournisseur se change sur la page et une
+# case touchée s'ouvre en grand. False = une seule source, SOURCE_PRINCIPALE,
+# et l'affichage classique des cases (tous les détails, rien à toucher).
+AFFICHAGE_INTERACTIF = bool(parametre("AFFICHAGE_INTERACTIF", defaut=True))
+# Identifiant du fournisseur : seule source si l'affichage n'est pas
+# interactif, fournisseur de départ sinon (open_meteo, meteofrance, ecmwf,
+# gfs, met_norway, openweathermap).
+SOURCE_PRINCIPALE = parametre("SOURCE_PRINCIPALE", defaut="open_meteo")
 
 # Fournisseurs de prévisions (facultatifs)
 MET_NORWAY_CONTACT = parametre("MET_NORWAY_CONTACT", defaut="")

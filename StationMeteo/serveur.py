@@ -2,6 +2,8 @@
 
 Lance :
     - l'acquisition périodique des capteurs Tuya (si ACQUISITION_AUTOMATIQUE) ;
+    - l'actualisation de fond des prévisions de tous les fournisseurs
+      (si AFFICHAGE_INTERACTIF) ;
     - la sauvegarde planifiée de la base (si SAUVEGARDE_AUTOMATIQUE, Linux) ;
     - l'application web app.py, servie par Waitress.
 
@@ -11,12 +13,17 @@ Utilisation : python serveur.py
 from waitress import serve
 
 from app import app
-from meteo import acquisition, config, sauvegarde
+from meteo import acquisition, config, previsions, sauvegarde
 
 
 def main():
     if config.ACQUISITION_AUTOMATIQUE:
         acquisition.demarrer_en_arriere_plan(config.INTERVALLE_ACQUISITION)
+
+    # Affichage interactif : tous les fournisseurs, même non affichés.
+    # Sinon seule la source principale est interrogée, à la demande.
+    if config.AFFICHAGE_INTERACTIF:
+        previsions.demarrer_en_arriere_plan()
 
     if config.SAUVEGARDE_AUTOMATIQUE:
         sauvegarde.demarrer_en_arriere_plan(

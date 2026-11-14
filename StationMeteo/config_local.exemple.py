@@ -39,6 +39,29 @@ SEUIL_ECART_TEMPERATURE = 2.0         # °C
 HISTORIQUE_TEMPERATURE_HEURES = 24
 INTERVALLE_CAPTEURS = 300             # secondes
 INTERVALLE_METEO = 3600               # secondes
+# Mode nuit : voile sombre sur tout l'écran. Luminosité en % (5 à 100).
+LUMINOSITE_NUIT = 35
+# Mode nuit programmé (heure de Paris, "HH:MM", la plage peut passer
+# minuit ; laisser "" pour ne pas programmer). Dans les deux affichages :
+# à NUIT_DEBUT la page passe en mode nuit, à NUIT_FIN elle revient au mode
+# jour si le mode nuit est toujours là. En affichage interactif, le bouton
+# 🌙 de la case en bas à droite passe aussi en mode nuit, et un toucher
+# n'importe où revient au mode jour.
+NUIT_DEBUT = "22:30"
+NUIT_FIN = "07:00"
+# Affichage interactif (écran tactile) :
+#   True  : tous les fournisseurs sont interrogés toutes les 3 h, le
+#           fournisseur se change en touchant « Prévisions : ... » et une
+#           case de prévision touchée s'ouvre en grand (heure par heure) ;
+#   False : une seule source (SOURCE_PRINCIPALE), cases classiques avec
+#           tous les détails, rien à toucher (mode nuit : uniquement aux
+#           heures NUIT_DEBUT / NUIT_FIN).
+AFFICHAGE_INTERACTIF = False
+# Fournisseur : seule source si AFFICHAGE_INTERACTIF = False ; sinon
+# fournisseur de départ tant qu'aucun n'a été choisi sur la page (le
+# dernier choisi est repris après un redémarrage). open_meteo, meteofrance, ecmwf, gfs, met_norway ou
+# openweathermap (ce dernier seulement avec une clé, voir plus bas).
+SOURCE_PRINCIPALE = "open_meteo"
 
 # --- Fournisseurs de prévisions (facultatifs) ---------------------------
 # MET Norway demande une adresse de contact dans ses requêtes.

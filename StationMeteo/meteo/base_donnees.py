@@ -151,3 +151,78 @@ def derniers_releves(historique_heures):
         }
         for c in capteurs
     ]
+
+
+def _nombre(valeur, decimales=1):
+    """Valeur numérique de la base (Decimal, float…) -> float arrondi."""
+    return None if valeur is None else round(float(valeur), decimales)
+
+
+def historique_capteur(capteur, heures, jours):
+    """Historique d'un capteur pour les graphiques de la page.
+
+    Renvoie un dictionnaire :
+      "heures" : relevés bruts des `heures` dernières heures
+                 [{"date", "temperature", "humidite"}, ...] ;
+      "jours"  : moyennes journalières des `jours` derniers jours,
+                 aujourd'hui compris
+                 [{"jour", "temperature", "temperature_min",
+                   "temperature_max", "humidite"}, ...].
+    Les températures invalides (Tuya -200 ou hors -100..100) sont ignorées.
+    """
+    with connexion() as cnx:
+        curseur = cnx.cursor(dictionary=True)
+        try:
+            curseur.execute("""
+                SELECT date_releve,
+                       CASE WHEN temperature > -100 AND temperature < 100
+                            THEN temperature END AS temperature,
+                       humidite
+                FROM releves
+                WHERE capteur = %s
+                  AND date_releve >= NOW() - INTERVAL %s HOUR
+                  AND date_releve <= NOW()
+                ORDER BY date_releve
+            """, (capteur, heures))
+            releves = curseur.fetchall()
+
+            curseur.execute("""
+                SELECT DATE(date_releve) AS jour,
+                       AVG(CASE WHEN temperature > -100 AND temperature < 100
+                                THEN temperature END) AS temperature,
+                       MIN(CASE WHEN temperature > -100 AND temperature < 100
+                                THEN temperature END) AS temperature_min,
+                       MAX(CASE WHEN temperature > -100 AND temperature < 100
+                                THEN temperature END) AS temperature_max,
+                       AVG(humidite) AS humidite
+                FROM releves
+                WHERE capteur = %s
+                  AND date_releve >= CURDATE() - INTERVAL %s DAY
+                  AND date_releve <= NOW()
+                GROUP BY DATE(date_releve)
+                ORDER BY jour
+            """, (capteur, jours - 1))
+            moyennes = curseur.fetchall()
+        finally:
+            curseur.close()
+
+    return {
+        "heures": [
+            {
+                "date": r["date_releve"].isoformat(),
+                "temperature": _nombre(r["temperature"]),
+                "humidite": _nombre(r["humidite"], 0),
+            }
+            for r in releves
+        ],
+        "jours": [
+            {
+                "jour": m["jour"].isoformat(),
+                "temperature": _nombre(m["temperature"]),
+                "temperature_min": _nombre(m["temperature_min"]),
+                "temperature_max": _nombre(m["temperature_max"]),
+                "humidite": _nombre(m["humidite"], 0),
+            }
+            for m in moyennes
+        ],
+    }

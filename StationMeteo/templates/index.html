@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="curseur-masque">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,6 +24,15 @@
     </main>
 
 </div>
+
+<!-- Vue agrandie d'une case de prévision ; un toucher la referme -->
+<div id="detail-prevision" class="vue-agrandie" hidden></div>
+
+<!-- Graphiques d'un capteur (24 h et 30 jours) ; un toucher les referme -->
+<div id="detail-capteur" class="vue-agrandie" hidden></div>
+
+<!-- Mode nuit : voile sombre sur tout l'écran ; un clic le retire -->
+<div id="voile-nuit" hidden title="Toucher pour revenir au mode jour"></div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

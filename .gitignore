@@ -23,3 +23,6 @@ Affiche_Meteo/previsions_du_jour.json
 *.bak
 *.bak.*
 StationMeteo/donnees/
+
+#AutresFichiers
+PbWifiStationMeteo.txt

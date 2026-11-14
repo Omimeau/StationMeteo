@@ -7,7 +7,7 @@ dictionnaires (et un code HTTP) que app.py transforme en JSON.
 import json
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import requests
@@ -36,8 +36,27 @@ caches_meteo = {
     for identifiant in FOURNISSEURS
 }
 
-# Empêche deux récupérations simultanées
+# Protège le choix du fournisseur actif
 verrou_cache = threading.Lock()
+
+# Un verrou par fournisseur : empêche deux récupérations simultanées
+# du même fournisseur, sans bloquer la page pendant que l'actualisation
+# de fond interroge un autre fournisseur.
+verrous = {identifiant: threading.Lock() for identifiant in FOURNISSEURS}
+
+# Protège les heures passées du jour (dictionnaire et fichier partagés)
+verrou_memoire = threading.Lock()
+
+# Actualisation de fond : âge à partir duquel un fournisseur est
+# de nouveau interrogé, et pause entre deux fournisseurs.
+AGE_MAX_FOND = 30 * 60
+PAUSE_ENTRE_FOURNISSEURS = 3
+
+# Créneaux de l'actualisation de fond : toutes les 3 heures (0 h, 3 h,
+# 6 h ... 21 h), soit le début et le milieu de chaque période de 6 h
+# (nuit, matin, après-midi, soir), quelques minutes après l'heure.
+ECART_CRENEAUX_HEURES = 3
+MINUTE_CRENEAU = 2
 
 
 # =======================================
@@ -47,8 +66,30 @@ verrou_cache = threading.Lock()
 FICHIER_FOURNISSEUR = config.DOSSIER_DONNEES / "fournisseur.json"
 
 
+def _source_principale():
+    """SOURCE_PRINCIPALE de config_local.py, si elle est disponible."""
+    if config.SOURCE_PRINCIPALE in FOURNISSEURS:
+        return config.SOURCE_PRINCIPALE
+
+    print("SOURCE_PRINCIPALE inconnue ou indisponible :",
+          config.SOURCE_PRINCIPALE, "-> utilisation de",
+          FOURNISSEUR_PAR_DEFAUT)
+    return FOURNISSEUR_PAR_DEFAUT
+
+
+SOURCE_PRINCIPALE = _source_principale()
+
+
 def lire_fournisseur():
-    """Fournisseur choisi sur la page, conservé après un redémarrage."""
+    """Fournisseur affiché au démarrage.
+
+    Affichage non interactif : toujours la source principale.
+    Affichage interactif : le dernier choisi sur la page (conservé après
+    un redémarrage), sinon la source principale.
+    """
+    if not config.AFFICHAGE_INTERACTIF:
+        return SOURCE_PRINCIPALE
+
     try:
         with open(FICHIER_FOURNISSEUR, "r", encoding="utf-8") as f:
             identifiant = json.load(f)["fournisseur"]
@@ -59,7 +100,7 @@ def lire_fournisseur():
     except (OSError, ValueError, KeyError):
         pass
 
-    return FOURNISSEUR_PAR_DEFAUT
+    return SOURCE_PRINCIPALE
 
 
 def enregistrer_fournisseur(identifiant):
@@ -86,10 +127,14 @@ def liste_fournisseurs():
 
 
 def choisir_fournisseur(identifiant):
-    """Change le fournisseur actif. Renvoie False s'il est inconnu."""
+    """Change le fournisseur actif.
+
+    Renvoie False s'il est inconnu ou si l'affichage n'est pas interactif
+    (la source principale est alors la seule source).
+    """
     global fournisseur_actif
 
-    if identifiant not in FOURNISSEURS:
+    if not config.AFFICHAGE_INTERACTIF or identifiant not in FOURNISSEURS:
         return False
 
     with verrou_cache:
@@ -154,6 +199,11 @@ previsions_du_jour = lire_previsions_du_jour()
 
 def conserver_heures_passees(identifiant, donnees):
     """Complète les prévisions avec les heures d'aujourd'hui déjà reçues."""
+    with verrou_memoire:
+        return _conserver_heures_passees(identifiant, donnees)
+
+
+def _conserver_heures_passees(identifiant, donnees):
     global previsions_du_jour
 
     jour = aujourdhui()
@@ -237,70 +287,173 @@ def _erreur(identifiant, message):
     }
 
 
+def _actualiser(identifiant, age_max=DUREE_CACHE):
+    """Actualise le cache d'un fournisseur si nécessaire.
+
+    À appeler en tenant verrous[identifiant]. Renvoie :
+        "cache"        cache encore valide, aucun appel ;
+        "valide"       prévisions récupérées à l'instant ;
+        "attente"      échec récent, anciennes prévisions conservées ;
+        "indisponible" attente après un échec, aucune prévision ;
+        "echec"        récupération en échec, aucune prévision.
+    """
+    fournisseur = FOURNISSEURS[identifiant]
+    cache_meteo = caches_meteo[identifiant]
+
+    maintenant = time.monotonic()
+
+    # 1. Cache encore valide
+    if cache_meteo["donnees"] is not None:
+        age = maintenant - cache_meteo["date_recuperation"]
+
+        if age < age_max:
+            return "cache"
+
+    # 2. Attente après un échec
+    if maintenant < cache_meteo["prochaine_tentative"]:
+        if cache_meteo["donnees"] is not None:
+            return "attente"
+        return "indisponible"
+
+    # 3. Nouvelle récupération des prévisions
+    print("Météo : interrogation de", fournisseur["nom"])
+
+    try:
+        donnees = conserver_heures_passees(
+            identifiant,
+            fournisseur["recuperer"](config.LATITUDE, config.LONGITUDE)
+        )
+
+        cache_meteo["donnees"] = donnees
+        cache_meteo["date_recuperation"] = time.monotonic()
+        cache_meteo["date_recuperation_reelle"] = (
+            datetime.now(FUSEAU).isoformat()
+        )
+        cache_meteo["prochaine_tentative"] = 0
+
+        print("Météo : prévisions actualisées", identifiant)
+        return "valide"
+
+    except (requests.RequestException, ValueError) as erreur:
+
+        print("Erreur météo", identifiant, ":", erreur)
+
+        cache_meteo["prochaine_tentative"] = (
+            time.monotonic() + DELAI_ERREUR
+        )
+
+        # Conservation des anciennes prévisions
+        if cache_meteo["donnees"] is not None:
+            print("Météo : anciennes prévisions conservées", identifiant)
+            return "attente"
+
+        return "echec"
+
+
 def obtenir_previsions():
     """Prévisions du fournisseur actif, depuis le cache si possible.
 
     Renvoie (dictionnaire, code HTTP).
     """
     with verrou_cache:
-
         identifiant = fournisseur_actif
-        fournisseur = FOURNISSEURS[identifiant]
-        cache_meteo = caches_meteo[identifiant]
 
-        maintenant = time.monotonic()
+    with verrous[identifiant]:
+        etat = _actualiser(identifiant)
 
-        # 1. Cache encore valide
-        if cache_meteo["donnees"] is not None:
-            age = maintenant - cache_meteo["date_recuperation"]
+        if etat == "cache":
+            print("Météo : utilisation du cache", identifiant)
+            return _reponse(identifiant, "valide"), 200
 
-            if age < DUREE_CACHE:
-                print("Météo : utilisation du cache", identifiant)
-                return _reponse(identifiant, "valide"), 200
+        if etat in ("valide", "attente"):
+            return _reponse(identifiant, etat), 200
 
-        # 2. Attente après un échec
-        if maintenant < cache_meteo["prochaine_tentative"]:
-
-            if cache_meteo["donnees"] is not None:
-                return _reponse(identifiant, "attente"), 200
-
+        if etat == "indisponible":
             return _erreur(
                 identifiant, "Service météo temporairement indisponible"
             ), 503
 
-        # 3. Nouvelle récupération des prévisions
-        print("Météo : interrogation de", fournisseur["nom"])
+        return _erreur(
+            identifiant, "Impossible de récupérer les prévisions"
+        ), 502
+
+
+# =======================================
+# ACTUALISATION DE FOND DE TOUS LES FOURNISSEURS
+# =======================================
+
+def actualiser_tous(arret=None):
+    """Interroge chaque fournisseur dont le cache a plus de 30 minutes.
+
+    Les fournisseurs non affichés restent ainsi prêts (changement
+    instantané) et leurs heures passées du jour sont mémorisées.
+    """
+    for numero, identifiant in enumerate(FOURNISSEURS):
+
+        if arret is not None and arret.is_set():
+            return
 
         try:
-            donnees = conserver_heures_passees(
-                identifiant,
-                fournisseur["recuperer"](config.LATITUDE, config.LONGITUDE)
-            )
+            with verrous[identifiant]:
+                etat = _actualiser(identifiant, AGE_MAX_FOND)
 
-            cache_meteo["donnees"] = donnees
-            cache_meteo["date_recuperation"] = time.monotonic()
-            cache_meteo["date_recuperation_reelle"] = (
-                datetime.now(FUSEAU).isoformat()
-            )
-            cache_meteo["prochaine_tentative"] = 0
+        except Exception as erreur:   # la boucle ne doit jamais s'arrêter
+            print("Erreur actualisation de fond", identifiant, ":", erreur)
+            etat = "echec"
 
-            print("Météo : prévisions actualisées")
+        # Petite pause entre deux appels d'API (pas après un cache)
+        if etat != "cache" and numero < len(FOURNISSEURS) - 1:
+            if arret is not None:
+                arret.wait(PAUSE_ENTRE_FOURNISSEURS)
+            else:
+                time.sleep(PAUSE_ENTRE_FOURNISSEURS)
 
-            return _reponse(identifiant, "valide"), 200
 
-        except (requests.RequestException, ValueError) as erreur:
+def prochain_creneau(maintenant=None):
+    """Prochain créneau de 3 h (heure de Paris) après maintenant."""
+    maintenant = maintenant or datetime.now(FUSEAU)
 
-            print("Erreur météo :", erreur)
+    creneau = maintenant.replace(
+        hour=(maintenant.hour // ECART_CRENEAUX_HEURES) * ECART_CRENEAUX_HEURES,
+        minute=MINUTE_CRENEAU, second=0, microsecond=0
+    )
 
-            cache_meteo["prochaine_tentative"] = (
-                time.monotonic() + DELAI_ERREUR
-            )
+    while creneau <= maintenant:
+        creneau += timedelta(hours=ECART_CRENEAUX_HEURES)
 
-            # Conservation des anciennes prévisions
-            if cache_meteo["donnees"] is not None:
-                print("Météo : anciennes prévisions utilisées")
-                return _reponse(identifiant, "attente"), 200
+    return creneau
 
-            return _erreur(
-                identifiant, "Impossible de récupérer les prévisions"
-            ), 502
+
+def _boucle_fond(arret):
+    while not arret.is_set():
+        try:
+            actualiser_tous(arret)
+        except Exception as erreur:   # la boucle ne doit jamais s'arrêter
+            print("Erreur actualisation de fond :", erreur)
+
+        creneau = prochain_creneau()
+        print("Météo : prochaine actualisation de fond à",
+              creneau.strftime("%H:%M"))
+
+        # Différence calculée en temps absolu (changement d'heure)
+        attente = creneau.timestamp() - time.time()
+        arret.wait(max(1, attente))
+
+
+def demarrer_en_arriere_plan():
+    """Lance l'actualisation de fond de tous les fournisseurs.
+
+    Renvoie un threading.Event : appeler .set() pour arrêter la boucle.
+    """
+    arret = threading.Event()
+
+    threading.Thread(
+        target=_boucle_fond,
+        args=(arret,),
+        name="previsions-fond",
+        daemon=True,
+    ).start()
+
+    print(f"Prévisions : tous les fournisseurs toutes les "
+          f"{ECART_CRENEAUX_HEURES} h")
+    return arret

@@ -2,10 +2,23 @@
     box-sizing: border-box;
 }
 
+/* Couleurs communes : à modifier uniquement ici */
+:root {
+    --fond-case: #010d1d;      /* fond de toutes les cases (prévisions,
+                                  information, capteurs) */
+}
+
+/* Kiosque tactile : curseur masqué tant que la souris ne bouge pas
+   (voir gererCurseur() dans app.js) */
+.curseur-masque,
+.curseur-masque * {
+    cursor: none !important;
+}
+
 body {
     margin: 0;
     padding: 12px;
-    background: #142338;
+    background: #000000;
     color: white;
     font-family: Arial, sans-serif;
 }
@@ -44,56 +57,146 @@ h1 {
 
 .case {
     border: 1px solid #405978;
-    background: #223751;
+    background: var(--fond-case);
     border-radius: 14px;
     padding: 15px;
     overflow: auto;
 }
 
 .aujourdhui {
-    background: #294967;
-    border: 2px solid #f8ce66;
+    border: 2px solid #816b33;
 }
 
+/* En-tête d'une case : date sur une seule ligne, puis période sur la
+   deuxième ligne, alignée à droite. Hauteur identique dans toutes les
+   cases : icônes et températures restent alignées d'une case à l'autre
+   (la taille doit laisser « Mercredi 18 Novembre » tenir sur une ligne
+   à 1280 px, sinon la date est raccourcie par « … »). */
 .date {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 8px;
-    font-size: clamp(16px, 1.8vw, 24px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    font-size: clamp(20px, 1.9vw, 30px);
     font-weight: bold;
     text-transform: capitalize;
     margin-bottom: 8px;
 }
 
+.date > span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .periode-case {
+    align-self: flex-end;
     font-size: 0.75em;
     font-weight: normal;
     color: #ffdf83;
     white-space: nowrap;
 }
 
-.description {
-    color: #d4e5f7;
-    font-size: clamp(13px, 1.3vw, 18px);
+/* Case d'un jour : en-tête, haut sur deux colonnes, résumé en bas */
+.case.jour {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.case.jour:active {
+    background: #24405e;
+}
+
+/* Deux colonnes : icône + description | température min puis max */
+.haut-prevision {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 0;
+}
+
+.ciel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    min-width: 0;
 }
 
 .icone {
-    font-size: clamp(27px, 3vw, 45px);
+    font-size: clamp(40px, 5vw, 72px);
+    line-height: 1.1;
+}
+
+/* Émojis affichés en images (static/emojis) : taille du texte voisin */
+img.emoji {
+    width: 1.15em;
+    height: 1.15em;
+    vertical-align: -0.2em;
+}
+
+.description {
+    color: #d4e5f7;
+    font-size: clamp(15px, 1.5vw, 20px);
+    overflow-wrap: anywhere;
+}
+
+/* Place de deux lignes réservée sous l'icône : une description sur deux
+   lignes (« Averses de neige ») ne remonte pas l'icône de sa case */
+.ciel .description {
+    min-height: 2.3em;
+    line-height: 1.15;
 }
 
 .temperature {
-    font-size: clamp(22px, 2.6vw, 38px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: clamp(28px, 3.5vw, 46px);
     font-weight: bold;
-    margin: 10px 0;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+.t-min {
+    color: #8fc7ff;
+}
+
+.t-max {
+    color: #ffb36b;
+}
+
+/* Résumé : pluie (mm et risque) et vent (vitesse et direction) */
+.resume {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: clamp(20px, 2vw, 26px);
+}
+
+.resume div {
+    padding: 5px 8px;
+    background: #ffffff0d;
+    border-radius: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .details {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 7px;
-    font-size: clamp(12px, 1.1vw, 16px);
+    font-size: clamp(14px, 1.1vw, 30px);
     line-height: 1.4;
 }
 
@@ -101,6 +204,166 @@ h1 {
     padding: 5px;
     background: #ffffff0d;
     border-radius: 5px;
+}
+
+/* =======================================
+   AFFICHAGE CLASSIQUE (AFFICHAGE_INTERACTIF = False)
+   ======================================= */
+
+/* Case d'un jour : icône et description sur une ligne, min / max,
+   puis tous les détails */
+.case.classique .icone {
+    font-size: clamp(27px, 3vw, 45px);
+    line-height: normal;
+}
+
+.case.classique .description {
+    font-size: clamp(13px, 1.3vw, 18px);
+    overflow-wrap: normal;
+}
+
+.case.classique .temperature {
+    display: block;
+    font-size: clamp(22px, 2.6vw, 38px);
+    line-height: normal;
+    margin: 8px 0;              /* 10px faisait déborder les dates sur 2 lignes */
+    white-space: normal;
+}
+
+/* =======================================
+   VUE AGRANDIE D'UNE CASE
+   ======================================= */
+
+/* Fond assombri sur tout l'écran ; un toucher referme la vue.
+   Sous le voile du mode nuit (z-index 1000). */
+.vue-agrandie {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: #000000b3;
+    cursor: pointer;
+}
+
+.vue-agrandie[hidden] {
+    display: none;
+}
+
+.fenetre-detail {
+    width: min(900px, 100%);
+    max-height: 100%;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 22px;
+    border: 2px solid #f8ce66;
+    border-radius: 16px;
+    background: #1a2b41;
+}
+
+/* Vue agrandie : assez large pour la date et la période sur une ligne
+   (place gagnée pour le tableau des 24 heures) */
+.fenetre-detail .date {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: clamp(20px, 2.2vw, 30px);
+    margin-bottom: 0;
+}
+
+.fenetre-detail .periode-case {
+    align-self: auto;
+}
+
+/* Fournisseur : un toucher passe au fournisseur suivant (la vue reste
+   ouverte) ; souligné comme « Prévisions » de la case d'information */
+.fournisseur-detail {
+    align-self: flex-start;
+    margin-top: -8px;
+    font-size: 14px;
+    color: #b7cbe1;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.fenetre-detail .haut-prevision {
+    flex: none;
+    grid-template-columns: 1fr 1fr;
+}
+
+.fenetre-detail .icone {
+    font-size: 60px;
+}
+
+.fenetre-detail .description {
+    font-size: 22px;
+}
+
+.fenetre-detail .ciel .description {
+    min-height: 0;
+}
+
+.fenetre-detail .temperature {
+    font-size: 42px;
+}
+
+.fenetre-detail .details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    font-size: 16px;
+}
+
+/* Tableau heure par heure des 24 heures du jour, sur deux colonnes
+   (0 h - 11 h | 12 h - 23 h) */
+.heures-jour {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+/* Heures de la période affichée */
+.heures tr.dans-periode td {
+    font-weight: bold;
+}
+
+.heures {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+.heures th {
+    color: #ffdf83;
+    font-weight: normal;
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #405978;
+}
+
+.heures td {
+    padding: 2px 8px;
+    border-bottom: 1px solid #ffffff14;
+    white-space: nowrap;
+}
+
+/* Icône du temps de chaque heure */
+.heures td:nth-child(2) {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.fermer-detail {
+    margin: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #b7cbe1;
 }
 
 /* =======================================
@@ -113,13 +376,70 @@ h1 {
     justify-content: flex-start;
     align-items: stretch;
     text-align: left;
-    gap: 12px;
+    gap: 6px;
+    overflow: hidden;
 }
 
 /* Date et heure centrées */
 .date-heure {
     text-align: center;
-    padding: 12px 0 20px 0;
+    padding: 0;                
+}
+
+/* Dernière ligne de la case, sur deux colonnes égales : bouton du mode
+   nuit centré dans la 1re, attribution OSM alignée à gauche dans la 2e ;
+   margin-top:auto la pousse en bas de la case */
+.bas-information {
+    flex: none;
+    min-height: 44px;          /* bouton 34 px + 10 px */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 10px;
+}
+
+.bas-information .bouton-nuit {
+    justify-self: center;
+}
+
+.bas-information .source-osm {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+}
+
+.bouton-nuit {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #405978;
+    border-radius: 50%;
+    background: #ffffff0d;
+    color: #ffdf83;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.bouton-nuit:active {
+    background: #ffffff26;
+}
+
+/* Voile du mode nuit : couvre tout l'écran et reçoit le clic de retour
+   au mode jour (rien en dessous n'est déclenché). L'opacité est réglée
+   par app.js selon LUMINOSITE_NUIT. */
+#voile-nuit {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: #000;
+    opacity: 0.65;
+    cursor: pointer;
+}
+
+#voile-nuit[hidden] {
+    display: none;
 }
 
 /* Date du jour */
@@ -127,40 +447,95 @@ h1 {
     font-size: clamp(20px, 2vw, 30px);
     font-weight: bold;
     text-transform: capitalize;
-    margin-bottom: 12px;
+    margin-bottom: 2px;
 }
 
 /* Horloge principale */
 .information .horloge {
-    font-size: clamp(32px, 4vw, 58px);
+    font-size: clamp(40px, 5vw, 68px);
+    line-height: 1.1;
     font-weight: bold;
     font-variant-numeric: tabular-nums;
 }
 
-/* Informations disposées comme les cases météo */
-.information .details {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 7px;
-    width: 100%;
+/* Informations les unes sous les autres, une seule ligne chacune */
+/* margin-top:auto abaisse les informations (et la dernière ligne qui
+   les suit) vers le bas de la case : l'espace libre reste sous l'horloge */
+.liste-infos {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: clamp(14px, 1.55vw, 20px);
 }
 
-/* Source météo */
-.source-meteo {
-    margin-top: auto;
-    font-size: 12px;
-    color: #b7cbe1;
+.liste-infos > div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 3px 8px;
+    background: #ffffff0d;
+    border-radius: 5px;
+}
+
+/* Fournisseur : le nom est raccourci (« … ») s'il est trop long */
+.ligne-fournisseur {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.ligne-fournisseur > span:first-child {
+    flex: none;
+}
+
+.erreur-info {
+    margin: 0;
+    font-size: 14px;
     text-align: center;
 }
 
-/* Fournisseur de prévisions : cliquable pour en changer */
-.choix-fournisseur {
-    display: inline-block;
-    padding: 6px 4px;
-    color: #ffdf83;
-    border-bottom: 1px dotted #ffdf83;
+/* Fournisseur de prévisions (affichage interactif) : toute la ligne est
+   cliquable pour en changer (zone de toucher plus grande). */
+.ligne-fournisseur.modifiable {
     cursor: pointer;
     user-select: none;
+    touch-action: manipulation;
+}
+
+.ligne-fournisseur.modifiable:active {
+    background: #ffffff26;
+}
+
+/* Fournisseur non modifiable (affichage classique) */
+.nom-fournisseur {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffdf83;
+}
+
+.choix-fournisseur {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffdf83;
+    text-decoration: underline dotted #ffdf83;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.source-osm {
+    flex: none;
+    font-size: 12px;
+    color: #b7cbe1;
+}
+
+/* Icône d'état (✅ ⚠️ ⏳) à côté des décomptes */
+.etat-compteur {
+    font-size: 0.9em;
 }
 
 /* =======================================
@@ -190,6 +565,8 @@ h1 {
 .colonne-capteurs {
     min-height: 0;
     overflow-y: auto;
+    padding-right: 6px;     /* cases un peu plus étroites : l'ascenseur
+                               ne recouvre pas leur bordure droite */
 }
 
 #liste-capteurs {
@@ -201,10 +578,88 @@ h1 {
 /* Une case par périphérique */
 .case-capteur {
     border: 1px solid #405978;
-    background: #223751;
+    background: var(--fond-case);
     border-radius: 14px;
     padding: 15px;
     text-align: center;
+}
+
+/* Affichage interactif : un toucher ouvre les graphiques du capteur */
+.case-capteur.cliquable {
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.case-capteur.cliquable:active {
+    background: #24405e;
+}
+
+/* Graphiques d'un capteur (vue agrandie) : nom du capteur tel quel */
+.fenetre-capteur .date {
+    text-transform: none;
+}
+
+.graphique-capteur h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: normal;
+    color: #ffdf83;
+}
+
+.graphique-capteur svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.graphique-capteur .grille-axe {
+    stroke: #ffffff14;
+    stroke-width: 1;
+}
+
+.graphique-capteur .texte-axe {
+    fill: #b7cbe1;
+    font-size: 13px;
+}
+
+.graphique-capteur .courbe {
+    fill: none;
+    stroke: #ffdf83;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+/* Bande minimum - maximum du jour : même couleur que la courbe, estompée */
+.graphique-capteur .bande {
+    fill: #ffdf83;
+    fill-opacity: 0.18;
+    stroke: none;
+}
+
+.graphique-capteur .legende-bande {
+    font-size: 14px;
+    color: #b7cbe1;
+}
+
+.graphique-capteur .point {
+    fill: #ffdf83;
+    stroke: #1a2b41;            /* anneau couleur du fond de la vue */
+    stroke-width: 2;
+}
+
+.graphique-capteur .etiquette {
+    fill: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.graphique-capteur .vide {
+    margin: 0;
+    padding: 30px 0;
+    text-align: center;
+    color: #b7cbe1;
 }
 
 .case-capteur h3 {
@@ -236,12 +691,6 @@ h1 {
 
 .ligne-mesures .detail-capteur {
     white-space: nowrap;
-}
-
-.date-capteur {
-    margin-top: 12px;
-    color: #b7cbe1;
-    font-size: 12px;
 }
 
 .extremes-capteur {
