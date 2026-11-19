@@ -93,6 +93,19 @@ NUIT_FIN = _heure_en_minutes("NUIT_FIN")
 if NUIT_DEBUT is None or NUIT_FIN is None or NUIT_DEBUT == NUIT_FIN:
     NUIT_DEBUT = NUIT_FIN = None
 
+# Mode nuit de l'écran : "voile" = voile sombre (LUMINOSITE_NUIT), l'écran
+# reste allumé ; "hdmi" = signal HDMI coupé (écran en veille, Linux /
+# kiosque cage), rallumé au premier toucher ou à NUIT_FIN.
+ECRAN_VEILLE = str(parametre("ECRAN_VEILLE", defaut="voile")).strip().lower()
+if ECRAN_VEILLE not in ("voile", "hdmi"):
+    print(f"ECRAN_VEILLE invalide (voile ou hdmi) : {ECRAN_VEILLE!r}, voile utilisé")
+    ECRAN_VEILLE = "voile"
+# Sortie vidéo coupée (nom donné par wlr-randr)
+ECRAN_SORTIE = parametre("ECRAN_SORTIE", defaut="HDMI-A-1")
+# Périphérique qui réveille l'écran ; vide = tous ceux de /dev/input/by-id
+# (tactile, souris, clavier USB)
+ECRAN_TACTILE = parametre("ECRAN_TACTILE", defaut="")
+
 # Affichage interactif (écran tactile) : True = tous les fournisseurs sont
 # interrogés en arrière-plan, le fournisseur se change sur la page et une
 # case touchée s'ouvre en grand. False = une seule source, SOURCE_PRINCIPALE,

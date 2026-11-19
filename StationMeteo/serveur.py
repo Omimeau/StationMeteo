@@ -4,6 +4,7 @@ Lance :
     - l'acquisition périodique des capteurs Tuya (si ACQUISITION_AUTOMATIQUE) ;
     - l'actualisation de fond des prévisions de tous les fournisseurs
       (si AFFICHAGE_INTERACTIF) ;
+    - le réveil de l'écran au toucher (si ECRAN_VEILLE = "hdmi", Linux) ;
     - la sauvegarde planifiée de la base (si SAUVEGARDE_AUTOMATIQUE, Linux) ;
     - l'application web app.py, servie par Waitress.
 
@@ -13,7 +14,7 @@ Utilisation : python serveur.py
 from waitress import serve
 
 from app import app
-from meteo import acquisition, config, previsions, sauvegarde
+from meteo import acquisition, config, ecran, previsions, sauvegarde
 
 
 def main():
@@ -24,6 +25,9 @@ def main():
     # Sinon seule la source principale est interrogée, à la demande.
     if config.AFFICHAGE_INTERACTIF:
         previsions.demarrer_en_arriere_plan()
+
+    # Veille HDMI : réveil de l'écran au toucher (ECRAN_VEILLE = "hdmi")
+    ecran.demarrer_en_arriere_plan()
 
     if config.SAUVEGARDE_AUTOMATIQUE:
         sauvegarde.demarrer_en_arriere_plan(

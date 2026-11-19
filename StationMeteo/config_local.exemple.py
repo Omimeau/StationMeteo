@@ -10,9 +10,9 @@ config_local.py n'est jamais publié sur GitHub (voir .gitignore).
 # automatiquement à partir de ~/StationMeteo/.mariadb_credentials.
 DB_HOST = "localhost"
 DB_PORT = 3306
-DB_USER = "meteomaison"
+DB_USER = "votreIdentifiantPourMariaDB"
 DB_PASSWORD = "remplacer_par_votre_mot_de_passe"
-DB_NAME = "meteomaison"
+DB_NAME = "NomDeVotreBase"
 
 # --- Serveur web ---------------------------------------------------------
 SERVEUR_HOTE = "0.0.0.0"
@@ -49,6 +49,16 @@ LUMINOSITE_NUIT = 35
 # n'importe où revient au mode jour.
 NUIT_DEBUT = "22:30"
 NUIT_FIN = "07:00"
+# Mode nuit de l'écran (Raspberry, kiosque cage) :
+#   "voile" : voile sombre (LUMINOSITE_NUIT), l'écran reste allumé ;
+#   "hdmi"  : en plus, signal HDMI coupé (écran en veille). Le premier
+#             toucher (ou NUIT_FIN) le rallume et revient au mode jour.
+#             fonctionne seulement sous Linux, pas sur PC Windows.
+ECRAN_VEILLE = "voile"
+ECRAN_SORTIE = "HDMI-A-1"             # sortie vidéo (wlr-randr)
+# Périphérique qui réveille l'écran ; "" = tous ceux de /dev/input/by-id
+# (ex. "/dev/input/by-id/usb-QDtech_MPI1001-event-if00")
+ECRAN_TACTILE = ""
 # Affichage interactif (écran tactile) :
 #   True  : tous les fournisseurs sont interrogés toutes les 3 h, le
 #           fournisseur se change en touchant « Prévisions : ... » et une

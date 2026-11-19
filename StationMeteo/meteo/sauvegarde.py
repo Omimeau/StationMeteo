@@ -1,4 +1,4 @@
-"""Sauvegarde la base MeteoMaison en SQL.gz puis l'envoie vers sa destination.
+"""Sauvegarde la base des relevés des capteurs de la maison en SQL.gz puis l'envoie vers sa destination.
 
 Utilisation (Linux uniquement) :
     - par serveur.py, en tâche de fond (demarrer_en_arriere_plan), à partir

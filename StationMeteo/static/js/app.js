@@ -777,10 +777,74 @@ function activerModeNuit() {
     const voile = document.getElementById("voile-nuit");
     voile.style.opacity = String(1 - luminositeNuit / 100);
     voile.hidden = false;
+
+    // Option ECRAN_VEILLE = "hdmi" : l'écran est en plus éteint
+    if (veilleHdmi && !ecranEteint) commanderEcran(true);
 }
 
 function activerModeJour() {
     document.getElementById("voile-nuit").hidden = true;
+
+    if (veilleHdmi && ecranEteint) commanderEcran(false);
+}
+
+// ==========================================
+// VEILLE DE L'ÉCRAN (option ECRAN_VEILLE = "hdmi")
+// ==========================================
+
+// Le serveur coupe le signal HDMI ; écran éteint, la page ne reçoit plus
+// les touchers : c'est le serveur qui rallume l'écran au premier appui.
+// La page le voit à la date du dernier réveil (GET /api/ecran) et repasse
+// alors en mode jour. Le voile reste dessous : si l'extinction échoue,
+// le mode nuit reste celui du voile.
+let veilleHdmi = false;
+let ecranEteint = false;
+let reveilConnu = null;
+
+async function commanderEcran(veille) {
+    try {
+        const reponse = await fetch("/api/ecran", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ veille })
+        });
+        if (!reponse.ok) throw new Error("HTTP " + reponse.status);
+
+        const etat = await reponse.json();
+        ecranEteint = etat.veille;
+        reveilConnu = etat.dernier_reveil;
+
+    } catch (e) {
+        console.error("Erreur veille de l'écran :", e);
+        ecranEteint = false;
+    }
+}
+
+// Appelée toutes les 2 s tant que l'écran est éteint
+async function surveillerReveil() {
+    if (!ecranEteint) return;
+
+    try {
+        const reponse = await fetch("/api/ecran", { cache: "no-store" });
+        if (!reponse.ok) return;
+        const etat = await reponse.json();
+
+        if (etat.veille || !ecranEteint) return;
+
+        if (etat.dernier_reveil !== reveilConnu) {
+            // Rallumé par un toucher : retour au mode jour
+            reveilConnu = etat.dernier_reveil;
+            ecranEteint = false;
+            activerModeJour();
+        } else {
+            // Serveur redémarré pendant la veille : la redemander
+            ecranEteint = false;
+            commanderEcran(true);
+        }
+
+    } catch (e) {
+        console.error("Erreur état de l'écran :", e);
+    }
 }
 
 // Mode nuit programmé (NUIT_DEBUT / NUIT_FIN de config_local.py), en
@@ -1118,7 +1182,7 @@ function graphiques30j(jours) {
 }
 
 // ==========================================
-// CAPTEURS METEOMAISON
+// CAPTEURS DE LA MAISON
 // ==========================================
 
 async function actualiserCapteurs() {
@@ -1221,7 +1285,7 @@ async function actualiserCapteurs() {
         }
 
     } catch (e) {
-        console.error("Erreur MeteoMaison :", e);
+        console.error("Erreur capteurs de la maison :", e);
         capteursOk = false;
 
         // En cas d'erreur, conserver les dernières cases.
@@ -1260,6 +1324,7 @@ async function initialiser() {
         interactif = config.interactif ?? interactif;
         nuitDebut = config.nuit_debut ?? null;
         nuitFin = config.nuit_fin ?? null;
+        veilleHdmi = config.veille_hdmi ?? false;
 
     } catch (e) {
         console.error("Erreur configuration :", e);
@@ -1337,6 +1402,9 @@ async function initialiser() {
 
     // Mode nuit programmé : état au chargement de la page
     verifierPlageNuit();
+
+    // Écran éteint (option hdmi) : guetter le réveil au toucher
+    if (veilleHdmi) setInterval(surveillerReveil, 2000);
 
     // Curseur masqué tant que la souris ne bouge pas
     document.addEventListener("pointermove", gererCurseur);

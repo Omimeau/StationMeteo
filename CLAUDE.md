@@ -62,7 +62,10 @@ Commandes utiles :
 - `python app.py` : serveur de dev Flask **sans** acquisition ni sauvegarde ;
 - `python -m meteo.acquisition` : une acquisition Tuya unique ;
 - `python -m meteo.sauvegarde` : une sauvegarde immédiate (Linux uniquement) ;
-- `python -m tinytuya wizard` : génère `tinytuya.json` / `devices.json`.
+- `python -m tinytuya wizard` : génère `tinytuya.json` / `devices.json` ;
+- `python verifier_config.py` : paramètres de `config_local.exemple.py`
+  absents de `config_local.py` (sans afficher les valeurs ; le modèle est
+  déployé sur le Raspberry pour ça).
 
 Il n'y a **ni tests automatisés, ni linter, ni build** : vérifier en lançant le
 serveur et en ouvrant la page.
@@ -127,6 +130,11 @@ serveur et en ouvrant la page.
   communs à toutes les cases. Mode nuit programmé (`NUIT_DEBUT` / `NUIT_FIN`,
   envoyés en minutes) : `verifierPlageNuit()` ne bascule qu'aux passages
   d'heure, pour laisser le bouton et le toucher libres entre les deux.
+  Option `ECRAN_VEILLE = "hdmi"` (défaut `"voile"`) : le mode nuit coupe en
+  plus le signal HDMI (`meteo/ecran.py`, `wlr-randr --off` dans la session
+  cage, `POST /api/ecran`) ; un thread du serveur lit `/dev/input` et
+  rallume l'écran au premier toucher, la page le voit par `GET /api/ecran`
+  (`dernier_reveil`) et repasse en mode jour.
 - **Icônes** : le choix actuel des icônes (émojis météo de `symbole()`,
   icônes des détails, des capteurs, des états ✅ ⚠️ ⏳, bouton 🌙…) est
   validé : ne pas les changer sauf demande explicite.

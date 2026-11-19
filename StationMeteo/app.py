@@ -8,7 +8,7 @@ import os
 
 from flask import Flask, jsonify, render_template, request
 
-from meteo import base_donnees, config, previsions
+from meteo import base_donnees, config, ecran, previsions
 
 app = Flask(__name__)
 
@@ -45,8 +45,26 @@ def api_config():
         # Minutes depuis minuit (heure de Paris), None = non programmé
         "nuit_debut": config.NUIT_DEBUT,
         "nuit_fin": config.NUIT_FIN,
+        # Mode nuit = écran éteint (option ECRAN_VEILLE = "hdmi")
+        "veille_hdmi": ecran.disponible(),
         "fournisseurs": previsions.liste_fournisseurs()
     })
+
+
+@app.route("/api/ecran", methods=["GET", "POST"])
+def api_ecran():
+    """Veille HDMI de l'écran. POST {"veille": true|false} ; GET : état
+    et date du dernier réveil au toucher."""
+    if not ecran.disponible():
+        return jsonify({"erreur": "Veille HDMI non activée"}), 403
+
+    if request.method == "POST":
+        veille = bool((request.get_json(silent=True) or {}).get("veille"))
+        reussi = ecran.mettre_en_veille() if veille else ecran.reveiller()
+        if not reussi:
+            return jsonify({"erreur": "Commande de l'écran impossible"}), 503
+
+    return jsonify(ecran.etat())
 
 
 @app.route("/api/capteurs")
