@@ -129,8 +129,14 @@ def _sauvegarder() -> int:
                 base,
             ]
             # Ecriture en flux pour ne jamais charger toute la base en RAM.
-            with tempfile.TemporaryFile(mode="w+b") as erreurs_dump:
-                with gzip.open(provisoire, "wb", compresslevel=6) as sortie:
+            # filename : nom inscrit dans l'en-tête gzip (".gz" retiré), que
+            # 7-Zip & co donnent au fichier décompressé ; sans lui ce serait
+            # le nom provisoire "….sql.gz.tmp".
+            with tempfile.TemporaryFile(mode="w+b") as erreurs_dump, \
+                    open(provisoire, "wb") as fichier_provisoire:
+                with gzip.GzipFile(filename=archive.name, mode="wb",
+                                   compresslevel=6,
+                                   fileobj=fichier_provisoire) as sortie:
                     with subprocess.Popen(
                         commande, stdout=subprocess.PIPE, stderr=erreurs_dump
                     ) as processus:
@@ -227,16 +233,19 @@ def creneau_suivant(apres: datetime, heure: time,
 
 
 def prochaine_sauvegarde(derniere, heure: time, periodicite_heures: int,
-                         maintenant: datetime) -> datetime:
+                         demarrage: datetime) -> datetime:
     """Date de la prochaine sauvegarde.
 
-    Sans sauvegarde connue : le prochain créneau à venir.
+    Sans sauvegarde connue : le premier créneau après le démarrage de la
+    planification. Ce point de départ est fixe : calculé depuis l'heure
+    courante, le créneau serait repoussé au suivant à chaque passage et
+    la première sauvegarde n'aurait jamais lieu.
     Sinon : le premier créneau après la dernière sauvegarde. Une date
     passée (Raspberry éteint au moment prévu) signifie « à faire tout de
     suite » ; la suivante reprend ensuite sur la grille des créneaux.
     """
     return creneau_suivant(
-        maintenant if derniere is None else derniere, heure, periodicite_heures
+        demarrage if derniere is None else derniere, heure, periodicite_heures
     )
 
 
@@ -244,13 +253,14 @@ def _boucle(heure, periodicite_heures, arret):
     if arret.wait(DELAI_DEMARRAGE):
         return
 
+    demarrage = datetime.now()
     nouvel_essai = None
     annoncee = None
 
     while not arret.is_set():
         maintenant = datetime.now()
         echeance = prochaine_sauvegarde(
-            derniere_sauvegarde(), heure, periodicite_heures, maintenant
+            derniere_sauvegarde(), heure, periodicite_heures, demarrage
         )
         if nouvel_essai and nouvel_essai > echeance:
             echeance = nouvel_essai

@@ -3,10 +3,20 @@
 Utilisation :
     - par serveur.py, en tâche de fond (demarrer_en_arriere_plan) ;
     - seule, pour une acquisition unique : python -m meteo.acquisition
+
+Économie d'appels API (quota de l'essai Tuya) :
+    - la connexion au cloud (et donc le jeton) est créée une seule fois
+      puis réutilisée ;
+    - la liste des appareils est mise en cache (rafraîchie une fois par jour) ;
+    - les appareils qui ne sont pas des capteurs sont écartés du cache ;
+    - l'état de tous les capteurs est lu en un seul appel groupé
+      (jusqu'à 20 appareils par appel).
+    Résultat : environ 1 appel par acquisition au lieu de 2 + nombre d'appareils.
 """
 
 import json
 import threading
+import time
 from datetime import datetime
 
 import tinytuya
@@ -16,24 +26,56 @@ from . import base_donnees, config
 # Valeur renvoyée par certains capteurs en cas de mesure anormale
 TEMPERATURE_INVALIDE = -200
 
+# Codes Tuya qui identifient un capteur de température / humidité
+CODES_CAPTEUR = {"va_temperature", "va_humidity"}
+
+# Durée de validité du cache de la liste des appareils (en secondes)
+DUREE_CACHE_APPAREILS = 24 * 3600
+
+# Nombre maximal d'appareils par appel groupé (limite de l'API Tuya)
+TAILLE_LOT = 20
+
+# État conservé entre deux acquisitions
+_cloud = None
+_appareils = None          # {device_id: nom}
+_date_appareils = 0.0
+_verrou = threading.Lock()
+
 
 def lire_config_tuya():
     with open(config.FICHIER_TINYTUYA, "r", encoding="utf-8") as fichier:
         return json.load(fichier)
 
 
-def lire_capteurs():
-    """Interroge le cloud Tuya.
+def _reinitialiser():
+    """Oublie la connexion et le cache (ils seront recréés au prochain relevé)."""
+    global _cloud, _appareils, _date_appareils
+    _cloud = None
+    _appareils = None
+    _date_appareils = 0.0
 
-    Renvoie une liste de tuples (capteur, temperature, humidite, batterie).
-    """
-    config_tuya = lire_config_tuya()
 
-    cloud = tinytuya.Cloud(
-        apiRegion=config_tuya["apiRegion"],
-        apiKey=config_tuya["apiKey"],
-        apiSecret=config_tuya["apiSecret"],
-    )
+def _obtenir_cloud():
+    """Crée la connexion au cloud une seule fois (1 appel pour le jeton)."""
+    global _cloud
+    if _cloud is None:
+        config_tuya = lire_config_tuya()
+        _cloud = tinytuya.Cloud(
+            apiRegion=config_tuya["apiRegion"],
+            apiKey=config_tuya["apiKey"],
+            apiSecret=config_tuya["apiSecret"],
+        )
+    return _cloud
+
+
+def _obtenir_appareils(cloud):
+    """Liste des appareils, mise en cache pendant DUREE_CACHE_APPAREILS."""
+    global _appareils, _date_appareils
+
+    maintenant = time.monotonic()
+    if (_appareils is not None
+            and maintenant - _date_appareils < DUREE_CACHE_APPAREILS):
+        return _appareils
 
     appareils = cloud.getdevices()
 
@@ -43,27 +85,77 @@ def lire_capteurs():
             + json.dumps(appareils, ensure_ascii=False)
         )
 
-    releves = []
+    _appareils = {
+        appareil["id"]: appareil.get("name", "Sans nom")
+        for appareil in appareils
+        if appareil.get("id")
+    }
+    _date_appareils = maintenant
+    print(f"Liste des appareils Tuya rafraîchie : {len(_appareils)} appareil(s).")
+    return _appareils
 
-    for appareil in appareils:
-        device_id = appareil.get("id")
-        nom = appareil.get("name", "Sans nom")
 
-        if not device_id:
-            continue
+def _lire_etats(cloud, device_ids):
+    """Lit l'état de plusieurs appareils en un appel par lot de 20.
 
-        try:
-            reponse = cloud.getstatus(device_id)
+    Renvoie {device_id: {code: valeur}}.
+    """
+    etats = {}
 
-            if not reponse.get("success", False):
-                print(f"Échec de lecture Tuya pour {nom}.")
-                continue
+    for debut in range(0, len(device_ids), TAILLE_LOT):
+        lot = device_ids[debut:debut + TAILLE_LOT]
+        reponse = cloud.cloudrequest(
+            "/v1.0/iot-03/devices/status",
+            query={"device_ids": ",".join(lot)},
+        )
 
-            valeurs = {
+        if not isinstance(reponse, dict) or not reponse.get("success", False):
+            raise RuntimeError(
+                "Échec de la lecture groupée Tuya : "
+                + json.dumps(reponse, ensure_ascii=False)
+            )
+
+        for appareil in reponse.get("result", []):
+            etats[appareil.get("id")] = {
                 element["code"]: element["value"]
-                for element in reponse.get("result", [])
+                for element in appareil.get("status", [])
                 if "code" in element and "value" in element
             }
+
+    return etats
+
+
+def lire_capteurs():
+    """Interroge le cloud Tuya.
+
+    Renvoie une liste de tuples (capteur, temperature, humidite, batterie).
+    """
+    with _verrou:
+        try:
+            cloud = _obtenir_cloud()
+            appareils = _obtenir_appareils(cloud)
+            etats = _lire_etats(cloud, list(appareils))
+        except Exception:
+            # Connexion ou jeton peut-être invalide : on repartira de zéro
+            # au prochain relevé (au lieu de réessayer en boucle).
+            _reinitialiser()
+            raise
+
+        releves = []
+
+        for device_id, nom in list(appareils.items()):
+            valeurs = etats.get(device_id)
+
+            if valeurs is None:
+                print(f"Pas de réponse Tuya pour {nom}.")
+                continue
+
+            # Appareil qui n'est pas un capteur (prise, ampoule...) :
+            # on le retire du cache pour ne plus l'interroger.
+            # (un état vide ne prouve rien : on garde l'appareil.)
+            if valeurs and not CODES_CAPTEUR & valeurs.keys():
+                del appareils[device_id]
+                continue
 
             temperature = valeurs.get("va_temperature")
             if temperature == TEMPERATURE_INVALIDE:
@@ -71,16 +163,12 @@ def lire_capteurs():
             humidite = valeurs.get("va_humidity")
             batterie = valeurs.get("va_battery")
 
-            # Ignorer les appareils qui ne sont pas des capteurs
             if temperature is None and humidite is None:
                 continue
 
             releves.append((nom, temperature, humidite, batterie))
 
-        except Exception as erreur:
-            print(f"Erreur pour {nom} : {erreur}")
-
-    return releves
+        return releves
 
 
 def acquerir():
